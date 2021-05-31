@@ -41,17 +41,6 @@ curl -sS -o /dev/null -H 'Content-Type: application/json' -X PUT localhost:39202
     }
 EOF
 
-echo "Set auto-follow pattern on follower for every index on leader"
-curl -sS -o /dev/null -H 'Content-Type: application/json' -X PUT localhost:39202/_ccr/auto_follow/geonames -d @- <<-EOF
-    {
-        "remote_cluster" : "leader",
-        "leader_index_patterns" :
-        [
-        "*"
-        ],
-        "follow_index_pattern" : "{{leader_index}}-copy"
-    }
-EOF
 
 # Create target-hosts file for Rally
 cat >ccr-target-hosts.json <<'EOF'
@@ -106,4 +95,10 @@ release.cache = true
 EOF
 
 # Start Rally
-esrally --configuration-name=metricstore --target-hosts=./ccr-target-hosts.json --pipeline=benchmark-only --on-error=abort --track=geonames --challenge=append-no-conflicts-index-only --track-params="ingest_percentage:20,number_of_shards:3" --telemetry="ccr-stats" --telemetry-params="ccr-stats-sample-interval:1"
+esrally race --configuration-name=metricstore --target-hosts=./ccr-target-hosts.json --pipeline=benchmark-only --on-error=abort --track=geonames --challenge=append-no-conflicts-index-only --track-params="ingest_percentage:50,number_of_shards:3" --telemetry="ccr-stats" --telemetry-params="ccr-stats-sample-interval:1"
+
+echo "waiting 1s before start CCR..."
+sleep 1
+
+echo "Set auto-follow pattern on follower for every index on leader"
+curl -H 'Content-Type: application/json' -XPUT http://localhost:39202/geonames_copy/_ccr/follow\?wait_for_active_shards\=1 -d'{"remote_cluster": "leader","leader_index": "geonames"}'
